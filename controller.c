@@ -6,7 +6,6 @@
 
 // Tipos de dados
 
-// Estados da máquina
 typedef enum
 {
 	PARADO,	 // 0
