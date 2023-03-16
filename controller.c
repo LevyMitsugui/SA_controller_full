@@ -1,5 +1,7 @@
 // ---------- Máquina de estados -----------
 
+// 01101111 01101001 00100000 01110000 01110010 01101111 01100110 01100101 01110011 01110011 01101111 01110010 
+
 #include "IO.c"
 
 #undef DEBUG
@@ -25,15 +27,13 @@ typedef enum
 	PARAR_T,	 // 7
 } separacao;
 
-typedef enum
-{
+typedef enum {
 	WAIT_OFF, // 0
 	WAIT_ON,  // 1
 } luz_do_a_parar;
 
 // timer block typedef
-typedef struct
-{
+typedef struct{
 	bool on = false;
 	uint64_t time = 0;
 } timerBlock;
@@ -41,12 +41,12 @@ typedef struct
 // Funções
 void initME();
 void update_timers();
-void start_timer(timerBlockt *t);
+void start_timer(timerBlock *t);
 void stop_timer(timerBlock *t);
 
 // Estado atual da máquina
 modos currentState_modos = PARADO;
-separacao currentState_separacao = Parar_T;
+separacao currentState_separacao = PARAR_T;
 luz_do_a_parar currentState_luz = WAIT_OFF;
 
 // Tempo de ciclo
@@ -146,6 +146,7 @@ int main()
 
 		// Leitura das entradas
 		read_inputs();
+		update_timers();
 
 		// detetecao de flancos
 		FE_START = (startPreviousState && !START) ? true : false;
@@ -200,16 +201,16 @@ int main()
 		switch (currentState_separacao)
 		{
 		case TAPETES_ON:
-			start_timer(timer1);
+			if (!timer1->on)
+				start_timer(&timer1);
 			if (SV1 == 4)
 				currentState_separacao = ANDAR_VERDE;
-				stop_timer(timer1);
-			else if (SV == 1)
+			else if (SV1 == 1)
 				currentState_separacao = ANDAR_AZUL;
-				stop_timer(timer1);
-			else if (A_PARAR == true && timerTapetesOn10s >=)
+			else if (A_PARAR == true && timer1->time >= 10)
 				currentState_separacao = BUFFER;
-				stop_timer(timer1);
+			else if (currentState_separacao != TAPETES_ON)
+				stop_timer(&timer1);
 
 			break;
 
@@ -227,6 +228,27 @@ int main()
 			if (RE_SPR == true)
 				currentState_separacao = TAPETES_ON;
 			break;
+		case ANDAR_AZUL:
+			if (FE_STR == true)
+				currentState_separacao = ANDAR_AZUL2;
+			break;
+
+		case ANDAR_AZUL2:
+			if (FE_ST2 == true)
+				currentState_separacao = TAPETES_ON;
+			break;
+
+		case BUFFER:
+			if (!timer1->on)
+				start_timer(&timer1);
+			if (timer1->time >=15)
+				currentState_separacao = PARAR_T;
+			break;
+
+		case PARAR_T:
+			if (OPERAR == true)
+				currentState_separacao = TAPETES_ON;
+			break;
 
 		default:
 			break;
@@ -236,22 +258,102 @@ int main()
 		switch (currentState_luz)
 		{
 		case WAIT_OFF:
-		
+			if(!timer2->on)
+				start_timer(&timer2);
+			if (A_PARAR == true && timer2->time >=1){
+				currentState_luz == WAIT_ON;
+				stop_timer(&timer1);
+			}
 			break;
 
 		case WAIT_ON: // scatman
-
+			if(!timer2->on)
+				start_timer(&timer2);
+			if (timer2->time >= 1){
+				currentState_luz == WAIT_OFF;
+				stop_timer(&timer2);
+			}
 			break;
 
 		default:
 			break;
 		}
-
 		// Atualiza saídas
-
 		// Saídas booleanas
-		FILL = (currentState == Encher);
-		DRAIN = (currentState == Esvaziar);
+		//Saidas Modos
+		if (currentState_modos == PARADO){
+			E1 = false;
+			LSTART = false;
+			LSTOP = true;
+			
+		}
+		else if (currentState_modos == OPERAR){
+			LSTOP = false;
+			LSTART = true;
+			E1 = true;
+		}
+		else if (currentState_modos == A_PARAR){
+			LSTOP = false;
+			LSTART = false;
+			E1 = false;
+		}
+
+		//Saídas Separacao
+		if(currentState_separacao == TAPETES_ON || currentState_luz == ANDAR_VERDE) {
+			T1A = 1;
+			T2A = 1;
+			T3A = 1;
+		}
+		else if (currentState_separacao == EMPURRAR_P){
+			T1A = 0;
+			T2A = 0;
+			T3A = 0;
+			
+			PE1 = 1;
+		}		
+		else if(currentState_separacao == RETRAIR_P){
+			PE1 = 0;
+			PR1 = 1;
+		}
+				else if(currentState_separacao == ANDAR_AZUL){
+			T1A = 1;
+			T2A = 1;
+			T3A = 1;
+		}
+		else if(currentState_separacao == ANDAR_AZUL2){
+			T1A = 0;
+			T2A = 1;
+			T3A = 1;
+		}
+		else if(currentState_separacao == BUFFER){
+			T1A = 0;
+			T2A = 1;
+			T3A = 1;
+		}
+		else if(currentState_separacao == PARAR_T){
+			T1A = 0;
+			T2A = 0;
+			T3A = 0;
+		}
+
+		if (currentState_luz == WAIT_ON){
+			LWAIT = 1;
+		} else {
+			LWAIT = 0;
+		}
+		
+		// Saidas Contador Azuis
+		if(FE_ST2){
+			AZUIS++;
+		}
+		if(FE_ST3){
+			VERDES++;
+		}
+		if(FE_START){
+			AZUIS = 0;
+			VERDES = 0;
+		}
+
 
 		// Escrita nas saídas
 		write_outputs();
