@@ -4,7 +4,7 @@
 
 #include "IO.c"
 
-#undef DEBUG
+#define DEBUG
 
 // Tipos de dados
 
@@ -34,15 +34,15 @@ typedef enum {
 
 // timer block typedef
 typedef struct{
-	bool on = false;
-	uint64_t time = 0;
+	bool on;
+	uint64_t time;
 } timerBlock;
 
 // Funções
 void initME();
 void update_timers();
-void start_timer(timerBlock *t);
-void stop_timer(timerBlock *t);
+//void start_timer(timerBlock *t);
+//void stop_timer(timerBlock *t);
 
 // Estado atual da máquina
 modos currentState_modos = PARADO;
@@ -50,7 +50,7 @@ separacao currentState_separacao = PARAR_T;
 luz_do_a_parar currentState_luz = WAIT_OFF;
 
 // Tempo de ciclo
-uint64_t scan_time = 1000; // 1 segundo
+uint64_t scan_time = 100; // 100ms
 
 // timers
 uint64_t start_time = 0, end_time = 0, cycle_time = 0;
@@ -70,8 +70,8 @@ int sprPreviousState = 0;
 bool RE_SPE = false;
 int spePreviousState = 0;
 
-bool FE_STR = false;
-int strPreviousState = 0;
+bool FE_STR2 = false;
+int str2PreviousState = 0;
 
 bool FE_ST2 = false;
 int st2PreviousState = 0;
@@ -127,8 +127,8 @@ void init_ME()
 	PR1 = 0;
 	PE2 = 0;
 	PR2 = 0;
-	uint16_t AZUIS = 0;
-	uint16_t VERDES = 0;
+	AZUIS = 0;
+	VERDES = 0;
 }
 
 // Código principal
@@ -157,8 +157,8 @@ int main()
 		sprPreviousState = SPR1;
 		RE_SPE = (!spePreviousState && SPE1) ? true : false;
 		spePreviousState = SPE1;
-		FE_STR = (strPreviousState && !STR1) ? true : false;
-		strPreviousState = STR1;
+		FE_STR2 = (str2PreviousState && !STR2) ? true : false;
+		str2PreviousState = STR2;
 		FE_ST2 = (st2PreviousState && !ST2) ? true : false;
 		st2PreviousState = ST2;
 		FE_ST3 = (st2PreviousState && !ST2) ? true : false;
@@ -172,6 +172,9 @@ int main()
 
 		case PARADO:
 			// Testa transição Parado -> Operar
+			#ifdef DEBUG
+				printf("\nmodos.PARADO\n");
+			#endif
 			if (FE_START == true)
 				// Próximo estado
 				currentState_modos = OPERAR;
@@ -180,6 +183,9 @@ int main()
 
 		case OPERAR:
 			// Testa transição OPERAR -> A_PARAR
+			#ifdef DEBUG
+				printf("\nmodos.OPERAR\n");
+			#endif
 			if (RE_STOP == true)
 				currentState_modos = A_PARAR;
 
@@ -187,6 +193,9 @@ int main()
 
 		case A_PARAR:
 			// Testa transição A_PARAR -> PARADO
+			#ifdef DEBUG
+				printf("\nmodos.A_PARAR\n");
+			#endif
 			if (currentState_separacao == PARAR_T)
 				currentState_modos = PARADO;
 
@@ -201,13 +210,16 @@ int main()
 		switch (currentState_separacao)
 		{
 		case TAPETES_ON:
-			if (!timer1->on)
+		#ifdef DEBUG
+				printf("\nseparacao.TAPETES_ON\n");
+		#endif
+			if (!timer1.on)
 				start_timer(&timer1);
 			if (SV1 == 4)
 				currentState_separacao = ANDAR_VERDE;
 			else if (SV1 == 1)
 				currentState_separacao = ANDAR_AZUL;
-			else if (A_PARAR == true && timer1->time >= 10)
+			else if (currentState_modos == A_PARAR && timer1.time >= 10)
 				currentState_separacao = BUFFER;
 			else if (currentState_separacao != TAPETES_ON)
 				stop_timer(&timer1);
@@ -215,38 +227,59 @@ int main()
 			break;
 
 		case ANDAR_VERDE:
-			if (FE_STR == true)
+		#ifdef DEBUG
+				printf("\nseparacao.ANDAR_VERDE\n");
+		#endif
+			if (FE_STR2 == true)
 				currentState_separacao = EMPURRAR_P;
 			break;
 
 		case EMPURRAR_P:
+		#ifdef DEBUG
+				printf("\nseparacao.EMPURRAR_P\n");
+		#endif
 			if (RE_SPE == true)
 				currentState_separacao = RETRAIR_P;
 			break;
 
 		case RETRAIR_P:
+		#ifdef DEBUG
+				printf("\nseparacao.RETRAIR_P\n");
+		#endif
 			if (RE_SPR == true)
 				currentState_separacao = TAPETES_ON;
 			break;
 		case ANDAR_AZUL:
-			if (FE_STR == true)
+		#ifdef DEBUG
+				printf("\nseparacao.ANDAR_AZUL\n");
+		#endif
+			if (FE_STR2 == true)
 				currentState_separacao = ANDAR_AZUL2;
 			break;
 
 		case ANDAR_AZUL2:
+		#ifdef DEBUG
+				printf("\nseparacao.ANDAR_AZUL2\n");
+		#endif
 			if (FE_ST2 == true)
 				currentState_separacao = TAPETES_ON;
 			break;
 
 		case BUFFER:
-			if (!timer1->on)
+		#ifdef DEBUG
+				printf("\nseparacao.BUFFER\n");
+		#endif
+			if (!timer1.on)
 				start_timer(&timer1);
-			if (timer1->time >=15)
+			if (timer1.time >=15)
 				currentState_separacao = PARAR_T;
 			break;
 
 		case PARAR_T:
-			if (OPERAR == true)
+		#ifdef DEBUG
+				printf("\nseparacao.PARAR_T\n");
+		#endif
+			if (currentState_modos == OPERAR)
 				currentState_separacao = TAPETES_ON;
 			break;
 
@@ -258,19 +291,25 @@ int main()
 		switch (currentState_luz)
 		{
 		case WAIT_OFF:
-			if(!timer2->on)
+		#ifdef DEBUG
+				printf("\ncurrent_State_luz.WAIT_OFF\n");
+		#endif
+			if(!timer2.on)
 				start_timer(&timer2);
-			if (A_PARAR == true && timer2->time >=1){
-				currentState_luz == WAIT_ON;
+			if (A_PARAR == true && timer2.time >=1){
+				currentState_luz = WAIT_ON;
 				stop_timer(&timer1);
 			}
 			break;
 
 		case WAIT_ON: // scatman
-			if(!timer2->on)
+		#ifdef DEBUG
+				printf("\ncurrent_State_luz.WAIT_ON\n");
+		#endif
+			if(!timer2.on)
 				start_timer(&timer2);
-			if (timer2->time >= 1){
-				currentState_luz == WAIT_OFF;
+			if (timer2.time >= 1){
+				currentState_luz = WAIT_OFF;
 				stop_timer(&timer2);
 			}
 			break;
@@ -282,29 +321,55 @@ int main()
 		// Saídas booleanas
 		//Saidas Modos
 		if (currentState_modos == PARADO){
+			#ifdef DEBUG
+				printf("\nsaidas_modos.PARADO\n");
+			#endif
 			E1 = false;
 			LSTART = false;
 			LSTOP = true;
 			
 		}
 		else if (currentState_modos == OPERAR){
+			#ifdef DEBUG
+				printf("\nsaidas_modos.OPERAR\n");
+			#endif
 			LSTOP = false;
 			LSTART = true;
 			E1 = true;
 		}
 		else if (currentState_modos == A_PARAR){
+			#ifdef DEBUG
+				printf("\nsaidas_modos.A_PARAR\n");
+			#endif
 			LSTOP = false;
 			LSTART = false;
 			E1 = false;
 		}
 
 		//Saídas Separacao
-		if(currentState_separacao == TAPETES_ON || currentState_luz == ANDAR_VERDE) {
+		if(currentState_separacao == TAPETES_ON) {
+			#ifdef DEBUG
+				printf("\nsaidas_separacao.TAPETES_ON\n");
+			#endif
+            PR1 = 0;	
+            T1A = 1;
+            T2A = 1;
+            T3A = 1;
+		}
+
+		else if(currentState_separacao == ANDAR_VERDE) {
+			#ifdef DEBUG
+				printf("\nsaidas_separacao.ANDAR_VERDE\n");
+			#endif
 			T1A = 1;
 			T2A = 1;
 			T3A = 1;
 		}
+
 		else if (currentState_separacao == EMPURRAR_P){
+			#ifdef DEBUG
+				printf("\nsaidas_separacao.EMPURRAR_P\n");
+			#endif
 			T1A = 0;
 			T2A = 0;
 			T3A = 0;
@@ -312,41 +377,65 @@ int main()
 			PE1 = 1;
 		}		
 		else if(currentState_separacao == RETRAIR_P){
+			#ifdef DEBUG
+				printf("\nsaidas_separacao.RETRAIR_P\n");
+			#endif
 			PE1 = 0;
 			PR1 = 1;
 		}
-				else if(currentState_separacao == ANDAR_AZUL){
+		else if(currentState_separacao == ANDAR_AZUL){
+			#ifdef DEBUG
+				printf("\nsaidas_separacao.ANDARA_AZUL\n");
+			#endif
 			T1A = 1;
 			T2A = 1;
 			T3A = 1;
 		}
 		else if(currentState_separacao == ANDAR_AZUL2){
+			#ifdef DEBUG
+				printf("\nsaidas_separacao.ANDAR_AZUL2\n");
+			#endif
 			T1A = 0;
 			T2A = 1;
 			T3A = 1;
 		}
 		else if(currentState_separacao == BUFFER){
+			#ifdef DEBUG
+				printf("\nsaidas_separacao.BUFFER\n");
+			#endif
 			T1A = 0;
 			T2A = 1;
 			T3A = 1;
 		}
 		else if(currentState_separacao == PARAR_T){
+			#ifdef DEBUG
+				printf("\nsaidas_separacao.PARAR_T\n");
+			#endif
 			T1A = 0;
 			T2A = 0;
 			T3A = 0;
 		}
 
 		if (currentState_luz == WAIT_ON){
+			#ifdef DEBUG
+				printf("\ncurrent_state_luz.WAIT_ON\n");
+			#endif
 			LWAIT = 1;
 		} else {
 			LWAIT = 0;
 		}
 		
-		// Saidas Contador Azuis
+		// Saidas Contador Azuis e Verdes
 		if(FE_ST2){
+			#ifdef DEBUG
+				printf("\nconta.azuis\n");
+			#endif
 			AZUIS++;
 		}
 		if(FE_ST3){
+			#ifdef DEBUG
+				printf("\nconta.verdes\n");
+			#endif
 			VERDES++;
 		}
 		if(FE_START){
